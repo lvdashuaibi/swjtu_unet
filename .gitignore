@@ -2,8 +2,8 @@
 
 __pycache__/
 checkpoints/
-*.pth
-*.jpg
+
+
 venv/
 .idea/
 wandb/
