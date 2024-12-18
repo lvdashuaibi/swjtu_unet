@@ -10,6 +10,10 @@ import glob
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+# 检查是否有GPU
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 # 定义数据集类
 class SegmentationDataset(Dataset):
     def __init__(self, imagePaths, maskPaths, transforms=None):
@@ -117,7 +121,7 @@ trainLoader = DataLoader(trainDS, batch_size=32, shuffle=True)
 testLoader = DataLoader(testDS, batch_size=1, shuffle=False)
 
 # 初始化模型、损失函数和优化器
-model = UNet()  # 不再使用 .cuda()，保持模型在 CPU 上运行
+model = UNet().to(device)  # 将模型移至GPU或CPU
 criterion = nn.BCEWithLogitsLoss()  # 适合二分类任务
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
@@ -130,8 +134,8 @@ for epoch in range(numEpochs):
     # 使用 tqdm 显示进度条
     with tqdm(trainLoader, desc=f"Epoch {epoch + 1}/{numEpochs}", unit="batch") as tepoch:
         for images, masks in tepoch:
-            # 直接在CPU上运行
-            images, masks = images, masks
+            # 将输入数据移至GPU或CPU
+            images, masks = images.to(device), masks.to(device)
 
             optimizer.zero_grad()
             outputs = model(images)
@@ -148,7 +152,7 @@ for epoch in range(numEpochs):
     print(f"Epoch {epoch + 1}/{numEpochs}, Loss: {epoch_loss / len(trainLoader)}")
 
 # 完成训练后，保存最终的完整模型
-torch.save(model, "unet_final_complete_model.pth")  # 保存整个模型，包括架构和参数
+torch.save(model.state_dict(), "unet_final_complete_model.pth")  # 仅保存模型权重
 print("Final complete model saved to 'unet_final_complete_model.pth'")
 
 # 测试模型并输出原图和分割后的图像
@@ -156,15 +160,15 @@ def evaluate_and_display(model, testLoader):
     model.eval()
     with torch.no_grad():
         for images, masks in testLoader:
-            # 在CPU上进行推理
-            images, masks = images, masks
+            # 在GPU或CPU上进行推理
+            images, masks = images.to(device), masks.to(device)
             outputs = model(images)
             preds = outputs > 0.5  # 二值化
 
             # 获取原图和预测图像
-            image = images[0].numpy().transpose(1, 2, 0)  # 转换为HWC格式
-            pred_mask = preds[0].numpy()  # 获取预测掩码
-            true_mask = masks[0].numpy()  # 获取真实掩码
+            image = images[0].cpu().numpy().transpose(1, 2, 0)  # 转换为HWC格式
+            pred_mask = preds[0].cpu().numpy()  # 获取预测掩码
+            true_mask = masks[0].cpu().numpy()  # 获取真实掩码
 
             # 显示原图和分割结果
             plt.figure(figsize=(10, 5))
